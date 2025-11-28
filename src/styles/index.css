@@ -628,7 +628,7 @@ body {
 
 .card-content.card-content--fill {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
 }
 
 .card-content.card-content--answer {
@@ -637,6 +637,8 @@ body {
 
 .fill-blank-content {
   width: 100%;
+  word-break: break-word;
+  overflow-wrap: break-word;
 }
 
 .answer-content {
@@ -681,21 +683,26 @@ body {
 
 /* ===== 填空 ===== */
 .blank-space {
-  display: inline;
-  border-bottom: 3px solid var(--color-text-light);
-  padding: 0 6px 3px;
-  margin: 0 3px;
+  display: inline-block;
+  vertical-align: baseline;
+  min-width: 4em;
+  border-bottom: 2px solid var(--color-text-light);
+  margin: 0 4px;
+  text-align: center;
+  line-height: 1.5;
 }
 
-.blank-space:empty::after {
-  content: '\00a0\00a0\00a0\00a0\00a0\00a0\00a0\00a0';
+.blank-space:empty::before {
+  content: '\00a0';
+  visibility: hidden;
 }
 
 .blank-space.revealed {
-  border-bottom: 3px solid var(--color-primary);
+  border-bottom: 2px solid var(--color-primary);
   color: var(--color-primary);
   font-weight: 600;
-  background: var(--color-glow);
+  background: linear-gradient(to top, var(--color-glow) 0%, var(--color-glow) 30%, transparent 30%);
+  padding: 0 6px;
 }
 
 /* ===== 导航按钮 ===== */
