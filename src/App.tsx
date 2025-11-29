@@ -319,7 +319,7 @@ const App: React.FC = () => {
               </button>
             </div>
             <div className="help-modal-content">
-              <p>闪卡数据使用 JSON 格式，支持<strong> 问答题 </strong>和<strong> 填空题 </strong>两种类型：</p>
+              <p>闪卡数据使用 JSON 格式，支持<strong> 问答题</strong>、<strong>填空题 </strong>和<strong> 判断题 </strong>三种类型：</p>
               
               <h4>📚 问答题</h4>
               <pre>{`{
@@ -334,6 +334,13 @@ const App: React.FC = () => {
   "答案": ["Meta (Facebook)", "2013"]
 }`}</pre>
 
+              <h4>✅ 判断题</h4>
+              <p>答案只能是 <code>"正确"</code> 或 <code>"错误"</code>：</p>
+              <pre>{`{
+  "题干": "React 是由 Google 公司开发的。",
+  "答案": ["错误"]
+}`}</pre>
+
               <h4>📄 完整示例</h4>
               <pre>{`[
   {
@@ -343,6 +350,10 @@ const App: React.FC = () => {
   {
     "题干": "JavaScript 中，$$答案$$ 用于声明常量。",
     "答案": ["const"]
+  },
+  {
+    "题干": "JavaScript 是一种强类型语言。",
+    "答案": ["错误"]
   }
 ]`}</pre>
             </div>
