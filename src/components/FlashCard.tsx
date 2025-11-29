@@ -147,6 +147,9 @@ const FlashCard: React.FC<FlashCardProps> = ({ card, isFlipped, onFlip, slideDir
 
   const slideClass = slideDirection ? `slide-in-${slideDirection}` : '';
   const stackClass = isLast ? '' : 'has-next';
+  
+  // 在滑入动画期间，强制显示正面，防止答案泄露
+  const shouldFlip = slideDirection ? false : isFlipped;
 
   // 获取题目类型标签
   const getCardLabel = () => {
@@ -210,7 +213,7 @@ const FlashCard: React.FC<FlashCardProps> = ({ card, isFlipped, onFlip, slideDir
       onClick={onFlip}
       onAnimationEnd={onAnimationEnd}
     >
-      <div className={`flashcard ${isFlipped ? 'flipped' : ''}`}>
+      <div className={`flashcard ${shouldFlip ? 'flipped' : ''}`}>
         {/* 正面 - 题干 */}
         <div className="flashcard-face flashcard-front">
           <div className="card-label">

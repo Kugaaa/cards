@@ -542,6 +542,12 @@ body {
   }
 }
 
+/* 滑入动画期间禁用翻转过渡，防止答案泄露 */
+.flashcard-container.slide-in-left .flashcard,
+.flashcard-container.slide-in-right .flashcard {
+  transition: none;
+}
+
 .flashcard {
   width: 100%;
   height: 100%;
