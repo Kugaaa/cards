@@ -824,6 +824,10 @@ body {
 
 /* ===== 重新导入按钮 ===== */
 .reimport-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
   padding: 12px 20px;
   background: var(--color-background-alt);
   color: var(--color-text);
@@ -837,8 +841,9 @@ body {
   margin-top: 16px;
 }
 
-.reimport-btn::before {
-  content: '↺ ';
+.reimport-btn svg {
+  width: 20px;
+  height: 20px;
 }
 
 .reimport-btn:hover {
