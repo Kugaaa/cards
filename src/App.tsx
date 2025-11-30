@@ -5,6 +5,7 @@ import FlashCard from './components/FlashCard';
 import ThemeSelector from './components/ThemeSelector';
 import ImportSection from './components/ImportSection';
 import Navigation from './components/Navigation';
+import CardEditor from './components/CardEditor';
 
 // localStorage keys
 const STORAGE_KEYS = {
@@ -21,6 +22,7 @@ const App: React.FC = () => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [showEditor, setShowEditor] = useState(false);
   
   // 从 localStorage 初始化主题设置
   const [theme, setTheme] = useState<ThemeName>(() => {
@@ -195,6 +197,19 @@ const App: React.FC = () => {
     }
   };
 
+  // 从编辑器导入卡片
+  const handleEditorImport = (importedCards: FlashCardType[]) => {
+    setCards(importedCards);
+    setCurrentIndex(0);
+    setIsFlipped(false);
+    setShowEditor(false);
+    
+    // 保存为 file 类型
+    localStorage.setItem(STORAGE_KEYS.DATA_TYPE, 'file');
+    localStorage.setItem(STORAGE_KEYS.CARDS_DATA, JSON.stringify(importedCards));
+    localStorage.removeItem(STORAGE_KEYS.DATA_SOURCE);
+  };
+
   // 重新导入
   const handleReimport = () => {
     setCards([]);
@@ -216,6 +231,18 @@ const App: React.FC = () => {
             <span>正在加载...</span>
           </div>
         </div>
+      </div>
+    );
+  }
+
+  // 显示编辑器页面
+  if (showEditor) {
+    return (
+      <div className="app-container">
+        <CardEditor 
+          onBack={() => setShowEditor(false)} 
+          onImport={handleEditorImport}
+        />
       </div>
     );
   }
@@ -262,6 +289,16 @@ const App: React.FC = () => {
             <circle cx="12" cy="12" r="10" />
             <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
             <circle cx="12" cy="17" r="0.5" fill="currentColor" />
+          </svg>
+        </button>
+        <button 
+          className="editor-btn" 
+          onClick={() => setShowEditor(true)}
+          title="题目配置"
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12 20h9" />
+            <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
           </svg>
         </button>
         <ThemeSelector 
