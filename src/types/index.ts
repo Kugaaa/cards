@@ -3,6 +3,16 @@ export interface FlashCard {
   答案: string[];
 }
 
+export interface HistoryRecord {
+  id: string;
+  name: string;
+  type: 'url' | 'file';
+  url?: string;
+  data?: FlashCard[];
+  cardCount: number;
+  lastAccess: number;
+}
+
 export type ThemeName = 'blue' | 'green' | 'purple' | 'orange' | 'pink';
 
 export interface ThemeColors {

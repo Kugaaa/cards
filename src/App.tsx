@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { FlashCard as FlashCardType, ThemeName } from './types';
+import { FlashCard as FlashCardType, ThemeName, HistoryRecord } from './types';
 import { themes, getThemeCSS } from './themes';
 import FlashCard from './components/FlashCard';
 import ThemeSelector from './components/ThemeSelector';
@@ -14,6 +14,23 @@ const STORAGE_KEYS = {
   DATA_SOURCE: 'flashcard-data-source',
   DATA_TYPE: 'flashcard-data-type', // 'url' | 'file'
   CARDS_DATA: 'flashcard-cards-data', // 直接存储卡片数据（文件上传时）
+  HISTORY: 'flashcard-history', // 历史记录
+};
+
+const MAX_HISTORY = 6;
+
+// 生成唯一 ID
+const generateId = () => Math.random().toString(36).substring(2, 9);
+
+// 从 URL 提取名称
+const extractNameFromUrl = (url: string): string => {
+  try {
+    const pathname = new URL(url).pathname;
+    const filename = pathname.split('/').pop() || '';
+    return filename.replace(/\.json$/i, '') || '未命名';
+  } catch {
+    return '未命名';
+  }
 };
 
 const App: React.FC = () => {
@@ -23,6 +40,16 @@ const App: React.FC = () => {
   const [isFlipped, setIsFlipped] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [showEditor, setShowEditor] = useState(false);
+  
+  // 历史记录
+  const [history, setHistory] = useState<HistoryRecord[]>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEYS.HISTORY);
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
   
   // 从 localStorage 初始化主题设置
   const [theme, setTheme] = useState<ThemeName>(() => {
@@ -37,6 +64,96 @@ const App: React.FC = () => {
   
   const [slideDirection, setSlideDirection] = useState<'left' | 'right' | null>(null);
   const [showHelp, setShowHelp] = useState(false);
+
+  // 保存历史记录到 localStorage
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.HISTORY, JSON.stringify(history));
+  }, [history]);
+
+  // 添加或更新历史记录
+  const addToHistory = useCallback((record: Omit<HistoryRecord, 'id' | 'lastAccess'> & { id?: string }) => {
+    setHistory(prev => {
+      // 查找是否已存在（通过 URL 或 ID）
+      const existingIndex = prev.findIndex(h => 
+        (record.type === 'url' && h.url === record.url) || 
+        (record.id && h.id === record.id)
+      );
+      
+      const newRecord: HistoryRecord = {
+        ...record,
+        id: record.id || generateId(),
+        lastAccess: Date.now(),
+      };
+      
+      let newHistory: HistoryRecord[];
+      
+      if (existingIndex >= 0) {
+        // 更新现有记录并移到最前面
+        newHistory = [
+          newRecord,
+          ...prev.filter((_, i) => i !== existingIndex)
+        ];
+      } else {
+        // 添加新记录到最前面
+        newHistory = [newRecord, ...prev];
+      }
+      
+      // 限制最多 6 条
+      return newHistory.slice(0, MAX_HISTORY);
+    });
+  }, []);
+
+  // 删除历史记录
+  const deleteHistory = useCallback((id: string) => {
+    setHistory(prev => prev.filter(h => h.id !== id));
+  }, []);
+
+  // 从历史记录加载
+  const loadFromHistory = useCallback(async (record: HistoryRecord) => {
+    setIsLoading(true);
+    
+    try {
+      let data: FlashCardType[];
+      
+      if (record.type === 'url' && record.url) {
+        const response = await fetch(record.url);
+        if (!response.ok) throw new Error('请求失败');
+        data = await response.json();
+      } else if (record.data) {
+        data = record.data;
+      } else {
+        throw new Error('无效的历史记录');
+      }
+      
+      if (Array.isArray(data) && data.length > 0) {
+        setCards(data);
+        setCurrentIndex(0);
+        setIsFlipped(false);
+        
+        // 更新访问时间
+        addToHistory({
+          ...record,
+          cardCount: data.length,
+        });
+        
+        // 保存当前数据源
+        if (record.type === 'url' && record.url) {
+          localStorage.setItem(STORAGE_KEYS.DATA_TYPE, 'url');
+          localStorage.setItem(STORAGE_KEYS.DATA_SOURCE, record.url);
+          localStorage.removeItem(STORAGE_KEYS.CARDS_DATA);
+        } else {
+          localStorage.setItem(STORAGE_KEYS.DATA_TYPE, 'file');
+          localStorage.setItem(STORAGE_KEYS.CARDS_DATA, JSON.stringify(data));
+          localStorage.removeItem(STORAGE_KEYS.DATA_SOURCE);
+        }
+      }
+    } catch (error) {
+      console.error('加载历史记录失败:', error);
+      // 如果加载失败，可以考虑删除该历史记录
+    } finally {
+      setIsLoading(false);
+    }
+  }, [addToHistory]);
 
   // 保存主题到 localStorage
   useEffect(() => {
@@ -54,58 +171,9 @@ const App: React.FC = () => {
     document.documentElement.style.cssText = getThemeCSS(currentTheme, isDark);
   }, [theme, isDark]);
 
-  // 首次加载时尝试恢复数据
+  // 首次加载完成
   useEffect(() => {
-    const loadSavedData = async () => {
-      setIsLoading(true);
-      
-      const dataType = localStorage.getItem(STORAGE_KEYS.DATA_TYPE);
-      const dataSource = localStorage.getItem(STORAGE_KEYS.DATA_SOURCE);
-      
-      if (dataType === 'url' && dataSource) {
-        // 从 URL 重新获取数据
-        try {
-          const response = await fetch(dataSource);
-          if (!response.ok) {
-            throw new Error('请求失败');
-          }
-          const data = await response.json() as FlashCardType[];
-          
-          if (Array.isArray(data) && data.length > 0) {
-            // 验证数据格式
-            for (const card of data) {
-              if (typeof card.题干 !== 'string' || !Array.isArray(card.答案)) {
-                throw new Error('数据格式不正确');
-              }
-            }
-            setCards(data);
-          }
-        } catch {
-          // 加载失败，清除保存的数据源
-          localStorage.removeItem(STORAGE_KEYS.DATA_SOURCE);
-          localStorage.removeItem(STORAGE_KEYS.DATA_TYPE);
-        }
-      } else if (dataType === 'file') {
-        // 从 localStorage 读取保存的卡片数据
-        const savedCards = localStorage.getItem(STORAGE_KEYS.CARDS_DATA);
-        if (savedCards) {
-          try {
-            const data = JSON.parse(savedCards) as FlashCardType[];
-            if (Array.isArray(data) && data.length > 0) {
-              setCards(data);
-            }
-          } catch {
-            // 解析失败，清除保存的数据
-            localStorage.removeItem(STORAGE_KEYS.CARDS_DATA);
-            localStorage.removeItem(STORAGE_KEYS.DATA_TYPE);
-          }
-        }
-      }
-      
-      setIsLoading(false);
-    };
-    
-    loadSavedData();
+    setIsLoading(false);
   }, []);
 
   // 导航函数
@@ -180,7 +248,7 @@ const App: React.FC = () => {
   }, [cards.length, goToPrevious, goToNext, toggleFlip]);
 
   // 处理导入
-  const handleImport = (importedCards: FlashCardType[], source?: { type: 'url' | 'file'; url?: string }) => {
+  const handleImport = (importedCards: FlashCardType[], source?: { type: 'url' | 'file'; url?: string; name?: string }) => {
     setCards(importedCards);
     setCurrentIndex(0);
     setIsFlipped(false);
@@ -190,10 +258,26 @@ const App: React.FC = () => {
       localStorage.setItem(STORAGE_KEYS.DATA_TYPE, 'url');
       localStorage.setItem(STORAGE_KEYS.DATA_SOURCE, source.url);
       localStorage.removeItem(STORAGE_KEYS.CARDS_DATA);
+      
+      // 添加到历史记录
+      addToHistory({
+        name: source.name || extractNameFromUrl(source.url),
+        type: 'url',
+        url: source.url,
+        cardCount: importedCards.length,
+      });
     } else if (source?.type === 'file') {
       localStorage.setItem(STORAGE_KEYS.DATA_TYPE, 'file');
       localStorage.setItem(STORAGE_KEYS.CARDS_DATA, JSON.stringify(importedCards));
       localStorage.removeItem(STORAGE_KEYS.DATA_SOURCE);
+      
+      // 添加到历史记录
+      addToHistory({
+        name: source.name || '本地文件',
+        type: 'file',
+        data: importedCards,
+        cardCount: importedCards.length,
+      });
     }
   };
 
@@ -208,6 +292,14 @@ const App: React.FC = () => {
     localStorage.setItem(STORAGE_KEYS.DATA_TYPE, 'file');
     localStorage.setItem(STORAGE_KEYS.CARDS_DATA, JSON.stringify(importedCards));
     localStorage.removeItem(STORAGE_KEYS.DATA_SOURCE);
+    
+    // 添加到历史记录
+    addToHistory({
+      name: '自定义题目',
+      type: 'file',
+      data: importedCards,
+      cardCount: importedCards.length,
+    });
   };
 
   // 重新导入
@@ -313,7 +405,12 @@ const App: React.FC = () => {
       <main className="main-content">
         {cards.length === 0 ? (
           // 导入区域
-          <ImportSection onImport={handleImport} />
+          <ImportSection 
+            onImport={handleImport}
+            history={history}
+            onLoadHistory={loadFromHistory}
+            onDeleteHistory={deleteHistory}
+          />
         ) : (
           // 卡片区域
           <div className="card-section">
