@@ -97,9 +97,27 @@ const ImportSection: React.FC<ImportSectionProps> = ({
     setError(null);
     setLoading(true);
 
+    const targetUrl = url.trim();
+
     try {
-      const response = await fetch(url);
+      let response: Response;
+      let usedProxy = false;
+
+      // 首先尝试直接请求
+      try {
+        response = await fetch(targetUrl);
+      } catch (fetchError) {
+        // 如果直接请求失败（可能是 CORS 问题），尝试使用代理
+        console.log('直接请求失败，尝试使用 CORS 代理...');
+        const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`;
+        response = await fetch(proxyUrl);
+        usedProxy = true;
+      }
+
       if (!response.ok) {
+        if (response.status === 0 || response.type === 'opaque') {
+          throw new Error('跨域请求被阻止，请确保服务器允许跨域访问，或下载文件后使用本地导入');
+        }
         throw new Error(`请求失败: ${response.status}`);
       }
 
@@ -116,9 +134,20 @@ const ImportSection: React.FC<ImportSectionProps> = ({
         }
       }
 
-      onImport(data, { type: 'url', url: url.trim() });
+      // 保存原始 URL（不是代理 URL）
+      onImport(data, { type: 'url', url: targetUrl });
+      
+      if (usedProxy) {
+        console.log('通过 CORS 代理成功获取数据');
+      }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'URL 获取失败');
+      const errorMessage = err instanceof Error ? err.message : 'URL 获取失败';
+      // 检查是否是网络/CORS 错误
+      if (errorMessage.includes('Failed to fetch') || errorMessage.includes('NetworkError')) {
+        setError('网络请求失败，可能是跨域限制。建议：下载 JSON 文件后使用「选择 JSON 文件」导入');
+      } else {
+        setError(errorMessage);
+      }
     } finally {
       setLoading(false);
     }

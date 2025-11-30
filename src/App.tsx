@@ -116,7 +116,17 @@ const App: React.FC = () => {
       let data: FlashCardType[];
       
       if (record.type === 'url' && record.url) {
-        const response = await fetch(record.url);
+        let response: Response;
+        
+        // 首先尝试直接请求
+        try {
+          response = await fetch(record.url);
+        } catch {
+          // 如果直接请求失败，尝试使用 CORS 代理
+          const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(record.url)}`;
+          response = await fetch(proxyUrl);
+        }
+        
         if (!response.ok) throw new Error('请求失败');
         data = await response.json();
       } else if (record.data) {
